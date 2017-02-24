@@ -1,32 +1,32 @@
 package HardeningCode;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
-
 import ilog.concert.*;
 import ilog.cplex.*;
 
-public class KVulnerableNodeILP {
+public class EntityHardeningILP {
 	private HashMap<String, Integer> entityLabeltoIndexMap; 
 	private HashMap<String, Integer> mintermLabelToIndexMap;
 	private HashMap<String, List<String>> IIRs;
 	private int K;
+	private int DK;
 	private int XCOUNT;
 	private int CCOUNT;
 	private int STEPS;
-	
+	private String fileName;
 	
 	// ILP variables
 	IloCplex cplex;
 	private IloIntVar[][] x;	
 	private IloIntVar[][] c;
-	private double constM = 100.0;
+	private IloIntVar[] qx; // entity hardened array
+	private int[] gx; // input from run of K most vulnerable ILP
 		
-	public KVulnerableNodeILP(String file, int KVal) {
+	public EntityHardeningILP(String file, int KVal, int DKVal) {
 		try {
 			entityLabeltoIndexMap = new HashMap<String, Integer>();
 			mintermLabelToIndexMap = new HashMap<String, Integer>();
@@ -68,9 +68,13 @@ public class KVulnerableNodeILP {
 			XCOUNT = entityLabeltoIndexMap.size();
 			CCOUNT = mintermLabelToIndexMap.size();
 			STEPS = IIRs.size() + 1;
+			fileName = file;
 			K = KVal;
+			DK = DKVal;
 			x = new IloIntVar[XCOUNT][STEPS];
 			c = new IloIntVar[CCOUNT][STEPS];
+			qx = new IloIntVar[XCOUNT];
+			gx = new int[XCOUNT];
 			scan.close();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
@@ -82,6 +86,9 @@ public class KVulnerableNodeILP {
 		try {
 			createXVariables();
 			createCVariables();
+			KVulnerableNodeILP attackerILP = new KVulnerableNodeILP(fileName, K);			
+			attackerILP.optimize();
+			gx = attackerILP.getInitialFailureX();
 			createConstraints();
 			createObjective();
 			cplex.solve();	
@@ -93,7 +100,8 @@ public class KVulnerableNodeILP {
 	public void createXVariables() {
 		try {
 			for (int i = 0; i < XCOUNT; i++) {				
-				x[i] = cplex.intVarArray(STEPS, 0, 1);				
+				x[i] = cplex.intVarArray(STEPS, 0, 1);	
+				qx[i] = cplex.intVar(0, 1);
 			}
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
@@ -115,7 +123,7 @@ public class KVulnerableNodeILP {
 			IloIntExpr expr = cplex.constant(0);
 			for (int i = 0; i < XCOUNT; i++)
 				expr = cplex.sum(expr, x[i][STEPS - 1]);
-			cplex.addMaximize(expr);
+			cplex.addMinimize(expr);
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 		}
@@ -130,12 +138,18 @@ public class KVulnerableNodeILP {
 					cplex.addGe(x[i][t], x[i][t-1]);
 				}
 			}
-			// Budget Constraint
+			
+			// Hardening Budget Constraint
 			expr = cplex.constant(0);
 			for (int i = 0;i < XCOUNT; i++)
-				expr = cplex.sum(expr, x[i][0]);			
-			cplex.addLe(expr, K);	
-			
+				expr = cplex.sum(expr, qx[i]);
+			cplex.addLe(expr, DK);	
+	
+			// If attacked entity is not defended it fails at t=0
+			for (int i = 0;i<XCOUNT;i++){				
+				cplex.addGe(x[i][0], cplex.diff(gx[i], qx[i]));
+			}
+		
 			// Generating constraints for IIRs
 			for(String str: IIRs.keySet()){
 				for(String minterms : IIRs.get(str)){
@@ -148,6 +162,7 @@ public class KVulnerableNodeILP {
 						cplex.addLe(c[mintermLabelToIndexMap.get(minterms)][t], expr);
 					}
 				}
+				
 				for(int t = 1; t < STEPS; t++){
 					IloNumExpr expr2 = cplex.constant(0);
 					IloNumExpr expr3 = cplex.constant(0);
@@ -156,14 +171,15 @@ public class KVulnerableNodeILP {
 						expr2 = cplex.sum(expr2, c[mintermLabelToIndexMap.get(minterms)][t - 1]);
 						minCount ++;
 					}
-					expr2 = cplex.prod(expr2, 1.0 / minCount);
+					expr3 = cplex.sum(expr3, expr2);
+					expr3 = cplex.prod(expr3, 1.0 / minCount);
+					expr3 = cplex.sum(expr3, x[entityLabeltoIndexMap.get(str)][0]);
+					cplex.addLe(x[entityLabeltoIndexMap.get(str)][t], expr3);
+					
 					expr2 = cplex.sum(expr2, x[entityLabeltoIndexMap.get(str)][0]);
-					cplex.addLe(x[entityLabeltoIndexMap.get(str)][t], expr2);
-					expr3 = cplex.sum(expr3, minCount);
-					expr3 = cplex.diff(expr3, expr2);
-					expr3 = cplex.prod(expr3, constM);
-					expr3 = cplex.sum(expr3, x[entityLabeltoIndexMap.get(str)][t]);
-					cplex.addGe(expr3, 1);
+					expr2 = cplex.diff(expr2, minCount - 1);
+					expr2 = cplex.diff(expr2, qx[entityLabeltoIndexMap.get(str)]);
+					cplex.addGe(x[entityLabeltoIndexMap.get(str)][t], expr2);
 				}
 				
 			}
@@ -176,7 +192,6 @@ public class KVulnerableNodeILP {
 					}
 				}
 			}
-			
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 		}
@@ -263,28 +278,15 @@ public class KVulnerableNodeILP {
 		catch(Exception e) {
 			System.out.println(e.getMessage());
 		}
-		return r;
-	}
-	
-	public List<Integer> getFinalFailureX() {
-		List<Integer> r = new ArrayList<Integer>();
-		try {
-			for(int i = 0; i < XCOUNT; i++) {
-				if (cplex.getValue(x[i][0]) > 0)
-					r.add(i);
-			}
-		}
-		catch(Exception e) {
-			System.out.println(e.getMessage());
-		}
+		
 		return r;
 	}
 
 	public static void main(String args[]) {
 		
-		KVulnerableNodeILP ex = new KVulnerableNodeILP("case14IIRsAtTimeStep1", 20);
+		EntityHardeningILP ex = new EntityHardeningILP("case14IIRsAtTimeStep1", 20, 8);
 		ex.optimize();
-		// ex.printX();
+		ex.printX();
 		ex.printReport();
 		System.out.println("Done");	
 }
