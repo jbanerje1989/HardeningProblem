@@ -59,6 +59,7 @@ public class KVulnerableNodeILP {
 				}
 				String[] minterms = exp.substring(index + 1, exp.length()).split("   ");
 				for(String str: minterms){
+					if(mintermLabelToIndexMap.containsKey(str)) continue;
 					mintermLabelToIndexMap.put(str, cTermIndex);
 					cTermIndex ++;
 				}
@@ -153,7 +154,7 @@ public class KVulnerableNodeILP {
 					IloNumExpr expr3 = cplex.constant(0);
 					double minCount = 0;
 					for(String minterms : IIRs.get(str)){
-						expr2 = cplex.sum(expr2, c[mintermLabelToIndexMap.get(minterms)][t - 1]);
+						expr2 = cplex.sum(expr2, c[mintermLabelToIndexMap.get(minterms)][t]);
 						minCount ++;
 					}
 					expr2 = cplex.prod(expr2, 1.0 / minCount);
@@ -194,38 +195,6 @@ public class KVulnerableNodeILP {
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 		}	    	 
-	}
-	
-	public void printC() {
-		try {
-			System.out.println("\nC: ");			
-			for(int i = 0; i < CCOUNT; i++) {
-				System.out.println();
-				for (int j = 0; j <STEPS-1; j++) {		
-					System.out.print(cplex.getValue(c[i][j]) + " ");					
-				}
-			}
-		} catch (Exception e) {
-			System.out.println(e.getMessage());
-		}	    	 
-	}
-	
-	public void printPretty() {
-		try {
-			System.out.println("\nX: ");
-			for(int i = 0; i < XCOUNT; i++) {
-				System.out.println();
-				for (int j = 0; j <STEPS; j++) {
-					if (cplex.getValue(x[i][j]) >0)
-						System.out.print("1 ");
-					else
-						System.out.print("0 ");
-				}
-			}
-			
-		} catch (Exception e) {
-			System.out.println(e.getMessage());
-		}
 	}
 	
 	public int printReport() {
@@ -270,7 +239,7 @@ public class KVulnerableNodeILP {
 		List<Integer> r = new ArrayList<Integer>();
 		try {
 			for(int i = 0; i < XCOUNT; i++) {
-				if (cplex.getValue(x[i][0]) > 0)
+				if (cplex.getValue(x[i][STEPS - 1]) > 0)
 					r.add(i);
 			}
 		}
@@ -282,7 +251,7 @@ public class KVulnerableNodeILP {
 
 	public static void main(String args[]) {
 		
-		KVulnerableNodeILP ex = new KVulnerableNodeILP("case14IIRsAtTimeStep1", 20);
+		KVulnerableNodeILP ex = new KVulnerableNodeILP("DataSet1", 15);
 		ex.optimize();
 		// ex.printX();
 		ex.printReport();

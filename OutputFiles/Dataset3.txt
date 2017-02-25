@@ -1,0 +1,22 @@
+a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28
+b0 b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 b16 b17 b18
+a0 <- b2   b6 b15
+a1 <- b3
+a2 <- b0   b6 b16
+a3 <- b5   b7 b17
+a4 <- b5   b14 b18
+b0 <- a2 a5   a3 a6
+b1 <- a2 a7   a4 a8
+b2 <- a0 a9
+b3 <- a1 a10
+b4 <- a2 a11   a3 a12
+b5 <- a3 a13   a4 a14
+b6 <- a2 a15   a3 a16
+b7 <- a2 a17   a3 a18
+b8 <- a0 a19   a3 a20
+b9 <- a0 a21
+b10 <- a0 a22
+b11 <- a1 a23
+b12 <- a2 a24   a4 a25
+b13 <- a2 a26   a4 a27
+b14 <- a4 a28

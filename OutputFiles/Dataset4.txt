@@ -1,0 +1,23 @@
+a0 a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 a14 a15 a16 a17 a18 a19 a20 a21 a22 a23 a24 a25 a26 a27 a28 a29 a30 a31 a32
+b0 b1 b2 b3 b4 b5 b6 b7 b8 b9 b10 b11 b12 b13 b14 b15 b16 b17 b18 b19
+a0 <- b1
+a1 <- b3   b11 b16
+a2 <- b2   b8 b17
+a3 <- b7   b13 b18
+a4 <- b0   b10 b19
+b0 <- a3 a5   a4 a6
+b1 <- a0 a7   a3 a8
+b2 <- a2 a9
+b3 <- a1 a10   a4 a11
+b4 <- a1 a12   a3 a13
+b5 <- a0 a14   a3 a15
+b6 <- a0 a16   a1 a17
+b7 <- a3 a18   a4 a19
+b8 <- a2 a20
+b9 <- a2 a21
+b10 <- a3 a22   a4 a23
+b11 <- a1 a24   a4 a25
+b12 <- a1 a26   a3 a27
+b13 <- a3 a28
+b14 <- a1 a29   a4 a30
+b15 <-a2 a31   a3 a32

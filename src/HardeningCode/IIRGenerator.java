@@ -35,6 +35,7 @@ public class IIRGenerator {
 	private ArrayList<ArrayList<Integer>> flowList = new ArrayList<ArrayList<Integer>>(); //maintains the adjacency list for flow between buses based on
 	// voltage measurement at a given time step (the inverse flow direction is maintained for IIR generation)
 	private List<List<List<Integer>>> IIRs = new ArrayList<List<List<Integer>>>(); //store the IIRs
+	private List<List<Integer>> IIRsDependentGenerator = new ArrayList<List<Integer>>(); 
 	// --------------------------------------------------------------------------------- //
 	
 	// --------------------------------------------------------------------------------- //
@@ -175,8 +176,32 @@ public class IIRGenerator {
 			if(flowList.get(bus).size() == 0) continue;
 			List<List<Integer>> minterm = new ArrayList<List<Integer>>();
 			minterm.add(Arrays.asList(bus));
-			for(int adjBus: flowList.get(bus)) minterm.add(Arrays.asList(adjBus)); 	
+			for(int adjBus: flowList.get(bus)) minterm.add(Arrays.asList(adjBus)); 
+			int covered[] = new int[busIndexToNumMap.size()];
+			int generator[] = new int[busIndexToNumMap.size()];
+			depthFirstSearch(bus, covered, generator);
 			IIRs.add(minterm);
+			if(busMap.get(bus).charAt(0) == 'G'){
+				IIRsDependentGenerator.add(Arrays.asList(bus));
+			}
+			else if(busMap.get(bus).charAt(0) == 'L'){
+				int index = 0;
+				List<Integer> generatorToAdd = new ArrayList<Integer>();
+				for(int x: generator){
+					if(x == 1) generatorToAdd.add(index);
+					index ++;
+				}
+				IIRsDependentGenerator.add(generatorToAdd);
+			}
+			else IIRsDependentGenerator.add(new ArrayList<Integer>());
+		}
+	}
+	
+	private void depthFirstSearch(int bus, int[] covered, int[] generator) {
+		covered[bus] = 1;
+		if(busMap.get(bus).charAt(0) == 'G') generator[bus] = 1;
+		for(int u: flowList.get(bus)){
+			if(covered[u] == 0) depthFirstSearch(u, covered, generator);
 		}
 	}
 	// --------------------------------------------------------------------------------- //
@@ -198,6 +223,7 @@ public class IIRGenerator {
 		}
 		sb.delete(sb.length() - 1, sb.length());
 		sb.append("\n");
+		int index = 0;
 		for(List<List<Integer>> IIR: IIRs){
 			sb.append(busMap.get(IIR.get(0).get(0)) + " <- ");
 			for(int j = 1; j < IIR.size(); j++){
@@ -212,6 +238,10 @@ public class IIRGenerator {
 				sb.append(busMap.get(minterm.get(minterm.size() - 1)));
 				if(j != IIR.size() - 1) sb.append("   ");
 			}
+			for(int generatorBus: IIRsDependentGenerator.get(index)){
+				sb.append("   " + busMap.get(generatorBus));
+			}
+			index ++;
 			sb.append("\n");
 		}
 		// write IIRs generated to file

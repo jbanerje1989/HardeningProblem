@@ -10,6 +10,7 @@ import ilog.cplex.*;
 
 public class EntityHardeningILP {
 	private HashMap<String, Integer> entityLabeltoIndexMap; 
+	private HashMap<Integer, String> entityIndexToLabelMap; 
 	private HashMap<String, Integer> mintermLabelToIndexMap;
 	private HashMap<String, List<String>> IIRs;
 	private int K;
@@ -29,6 +30,7 @@ public class EntityHardeningILP {
 	public EntityHardeningILP(String file, int KVal, int DKVal) {
 		try {
 			entityLabeltoIndexMap = new HashMap<String, Integer>();
+			entityIndexToLabelMap = new HashMap<Integer, String>();
 			mintermLabelToIndexMap = new HashMap<String, Integer>();
 			IIRs = new HashMap<String, List<String>>();
 			File caseFile = new File("OutputFiles/" + file + ".txt");
@@ -37,11 +39,13 @@ public class EntityHardeningILP {
 			int index = 0;
 			for(String str : entitySet1){
 				entityLabeltoIndexMap.put(str, index);
+				entityIndexToLabelMap.put(index, str);
 				index ++;
 			}
 			String[] entitySet2 = scan.nextLine().split(" ");
 			for(String str : entitySet2){
 				entityLabeltoIndexMap.put(str, index);
+				entityIndexToLabelMap.put(index, str);
 				index ++;
 			}
 			int cTermIndex = 0;
@@ -59,6 +63,7 @@ public class EntityHardeningILP {
 				}
 				String[] minterms = exp.substring(index + 1, exp.length()).split("   ");
 				for(String str: minterms){
+					if(mintermLabelToIndexMap.containsKey(str)) continue;
 					mintermLabelToIndexMap.put(str, cTermIndex);
 					cTermIndex ++;
 				}
@@ -89,6 +94,9 @@ public class EntityHardeningILP {
 			KVulnerableNodeILP attackerILP = new KVulnerableNodeILP(fileName, K);			
 			attackerILP.optimize();
 			gx = attackerILP.getInitialFailureX();
+			for(int i = 0; i < XCOUNT; i++){
+				if(gx[i] != 0) System.out.println(entityIndexToLabelMap.get(i) + " " + gx[i]);
+			}
 			createConstraints();
 			createObjective();
 			cplex.solve();	
@@ -168,7 +176,7 @@ public class EntityHardeningILP {
 					IloNumExpr expr3 = cplex.constant(0);
 					double minCount = 0;
 					for(String minterms : IIRs.get(str)){
-						expr2 = cplex.sum(expr2, c[mintermLabelToIndexMap.get(minterms)][t - 1]);
+						expr2 = cplex.sum(expr2, c[mintermLabelToIndexMap.get(minterms)][t]);
 						minCount ++;
 					}
 					expr3 = cplex.sum(expr3, expr2);
@@ -199,9 +207,11 @@ public class EntityHardeningILP {
 	
 	public void printX() {
 		try {
+			System.out.println();
 			System.out.println("\nX: ");
 			for(int i = 0; i < XCOUNT; i++) {
 				System.out.println();
+				System.out.print(entityIndexToLabelMap.get(i) + " ");
 				for (int j = 0; j < STEPS; j++) {
 					System.out.print(cplex.getValue(x[i][j]) + " ");
 				}
@@ -209,38 +219,6 @@ public class EntityHardeningILP {
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 		}	    	 
-	}
-	
-	public void printC() {
-		try {
-			System.out.println("\nC: ");			
-			for(int i = 0; i < CCOUNT; i++) {
-				System.out.println();
-				for (int j = 0; j <STEPS-1; j++) {		
-					System.out.print(cplex.getValue(c[i][j]) + " ");					
-				}
-			}
-		} catch (Exception e) {
-			System.out.println(e.getMessage());
-		}	    	 
-	}
-	
-	public void printPretty() {
-		try {
-			System.out.println("\nX: ");
-			for(int i = 0; i < XCOUNT; i++) {
-				System.out.println();
-				for (int j = 0; j <STEPS; j++) {
-					if (cplex.getValue(x[i][j]) >0)
-						System.out.print("1 ");
-					else
-						System.out.print("0 ");
-				}
-			}
-			
-		} catch (Exception e) {
-			System.out.println(e.getMessage());
-		}
 	}
 	
 	public int printReport() {
@@ -254,6 +232,14 @@ public class EntityHardeningILP {
 					// System.out.println(i);
 				}
 			}
+			System.out.println("Initially Killed Entities");
+			for(int i = 0; i < XCOUNT; i++){
+				if(gx[i] != 0) System.out.print(entityIndexToLabelMap.get(i) + " ");
+			}
+			System.out.println("Hardened Entities");
+			for(int i = 0; i < XCOUNT; i++){
+				if(cplex.getValue(qx[i]) != 0) System.out.print(entityIndexToLabelMap.get(i) + " ");
+			}
 			System.out.println("\n\n==============================================");
 			System.out.println("Time Steps       : " + STEPS);
 			System.out.println("Total Components : " + XCOUNT);
@@ -265,30 +251,13 @@ public class EntityHardeningILP {
 		return compnentsDead;
 	}
 
-	public int[] getInitialFailureX() {
-		int[] r = new int[XCOUNT];
-		try {
-			for(int i = 0; i < XCOUNT; i++) {
-				if (cplex.getValue(x[i][0]) > 0)
-					r[i] = 1;
-				else
-					r[i] = 0;
-			}
-		}
-		catch(Exception e) {
-			System.out.println(e.getMessage());
-		}
-		
-		return r;
-	}
-
 	public static void main(String args[]) {
 		
-		EntityHardeningILP ex = new EntityHardeningILP("case14IIRsAtTimeStep1", 20, 8);
+		EntityHardeningILP ex = new EntityHardeningILP("DataSet1", 15, 6);
 		ex.optimize();
-		ex.printX();
+		// ex.printX();
 		ex.printReport();
 		System.out.println("Done");	
-}
+	}
 }
 
