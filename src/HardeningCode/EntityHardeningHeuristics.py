@@ -15,11 +15,11 @@ while True:
         if index == 0:
             val2 = val.split(" ");
             leftSideEntity.append(val2[0]);
+            minterms.append(leftSideEntity);
             minterms.append(val2[2].split(" "));
         else :
             minterms.append(val.split(" "))
         index = index + 1;
-    IDR.append(leftSideEntity);
     IDR.append(minterms); 
 
 os.chdir('/Users/joydeepbanerjee/Dropbox/papers/WorkUnderProgress/ElsevierJournal/Paper Code/HardeningProblem/src/HardeningCode/');
