@@ -1,6 +1,9 @@
 package HardeningCode;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -14,6 +17,7 @@ public class KVulnerableNodeILP {
 	private HashMap<String, Integer> entityLabeltoIndexMap; 
 	private HashMap<String, Integer> mintermLabelToIndexMap;
 	private HashMap<String, List<String>> IIRs;
+	private String fileName;
 	private int K;
 	private int XCOUNT;
 	private int CCOUNT;
@@ -69,6 +73,7 @@ public class KVulnerableNodeILP {
 			XCOUNT = entityLabeltoIndexMap.size();
 			CCOUNT = mintermLabelToIndexMap.size();
 			STEPS = IIRs.size() + 1;
+			fileName = file;
 			K = KVal;
 			x = new IloIntVar[XCOUNT][STEPS];
 			c = new IloIntVar[CCOUNT][STEPS];
@@ -248,13 +253,76 @@ public class KVulnerableNodeILP {
 		}
 		return r;
 	}
+	
+	public void generateFileForHeuristic() throws IOException{
+		StringBuilder sb = new StringBuilder();
+		List<Integer> finalFailure = getFinalFailureX();
+		File caseFile = new File("OutputFiles/" + fileName + ".txt");
+		Scanner scan = new Scanner(caseFile);
+		String[] entitySet1 = scan.nextLine().split(" ");
+		int[] initFailure = getInitialFailureX();
+		int index = 0;
+		StringBuilder entitiesFailedInit = new StringBuilder();
+		for(String str : entitySet1){
+			if(finalFailure.contains(index)) sb.append(str + " ");
+			if(initFailure[index] == 1) entitiesFailedInit.append(str + " ");
+			index ++;
+		}
+		String[] entitySet2 = scan.nextLine().split(" ");
+		for(String str : entitySet2){
+			if(finalFailure.contains(index)) sb.append(str + " ");
+			if(initFailure[index] == 1) entitiesFailedInit.append(str + " ");
+			index ++;
+		}
+		sb.delete(sb.length() - 1, sb.length());
+		sb.append("\n");
+		entitiesFailedInit.delete(entitiesFailedInit.length() - 1, entitiesFailedInit.length());
+		sb.append(entitiesFailedInit.toString());
+		sb.append("\n");
+		while(scan.hasNext()){
+			String exp = scan.nextLine();
+			StringBuilder firstEntity = new StringBuilder();
+			index = 0;
+			while(exp.charAt(index) != ' '){
+				firstEntity.append(exp.charAt(index));
+				index ++;
+			}
+			if(!finalFailure.contains(entityLabeltoIndexMap.get(firstEntity.toString()))) continue;
+			sb.append(firstEntity.toString() + " <-");
+			index ++;
+			while(exp.charAt(index) != ' '){
+				index ++;
+			}
+			String[] minterms = exp.substring(index + 1, exp.length()).split("   ");
+			index = 0;
+			for(String str: minterms){
+				String[] vals = str.split(" ");
+				for(String entity: vals){
+					if(finalFailure.contains(entityLabeltoIndexMap.get(entity))) sb.append(" " + entity);
+				}
+				if(index < minterms.length) sb.append("  ");
+				index ++;
+			}
+			sb.append("\n");
+		}
+		scan.close();
+		File file = new File("OutFileForHeuristics/" + fileName + "Heuristic" + "forK" + K + ".txt");
+		BufferedWriter writer = null;
+		try {
+		    writer = new BufferedWriter(new FileWriter(file));
+		    writer.append(sb);
+		} finally {
+		    if (writer != null) writer.close();
+		}
+	}
 
-	public static void main(String args[]) {
+	public static void main(String args[]) throws IOException {
 		
 		KVulnerableNodeILP ex = new KVulnerableNodeILP("DataSet1", 15);
 		ex.optimize();
 		// ex.printX();
 		ex.printReport();
+		ex.generateFileForHeuristic();
 		System.out.println("Done");	
 }
 }
