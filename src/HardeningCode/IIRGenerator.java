@@ -210,19 +210,6 @@ public class IIRGenerator {
 	// Generate the IIRs in proper representation form
 	public void generateFilesForIIRs() throws IOException{
 		StringBuilder sb = new StringBuilder();
-		for(int i = 0; i < numBuses; i++){
-			sb.append(busMap.get(i) + " ");
-		}
-		sb.delete(sb.length() - 1, sb.length());
-		sb.append("\n");
-		HashMap<String, Integer> dummy = new HashMap<String, Integer>();
-		for(int i = 0; i < edge.length; i++){
-			String line = Integer.toString(edge[i][0]) + Integer.toString(edge[i][1]);
-			if(!dummy.containsKey(line)) sb.append(transMap.get(Integer.parseInt(line)) + " ");
-			dummy.put(line, i);
-		}
-		sb.delete(sb.length() - 1, sb.length());
-		sb.append("\n");
 		int index = 0;
 		for(List<List<Integer>> IIR: IIRs){
 			sb.append(busMap.get(IIR.get(0).get(0)) + " <- ");

@@ -10,7 +10,6 @@ import ilog.cplex.*;
 
 public class EntityHardeningILP {
 	private HashMap<String, Integer> entityLabeltoIndexMap; 
-	private HashMap<Integer, String> entityIndexToLabelMap; 
 	private HashMap<String, Integer> mintermLabelToIndexMap;
 	private HashMap<String, List<String>> IIRs;
 	private int K;
@@ -18,6 +17,7 @@ public class EntityHardeningILP {
 	private int XCOUNT;
 	private int CCOUNT;
 	private int STEPS;
+	private int compDeadInit;
 	private String fileName;
 	
 	// ILP variables
@@ -30,32 +30,23 @@ public class EntityHardeningILP {
 	public EntityHardeningILP(String file, int KVal, int DKVal) {
 		try {
 			entityLabeltoIndexMap = new HashMap<String, Integer>();
-			entityIndexToLabelMap = new HashMap<Integer, String>();
 			mintermLabelToIndexMap = new HashMap<String, Integer>();
 			IIRs = new HashMap<String, List<String>>();
 			File caseFile = new File("OutputFiles/" + file + ".txt");
 			Scanner scan = new Scanner(caseFile);
-			String[] entitySet1 = scan.nextLine().split(" ");
-			int index = 0;
-			for(String str : entitySet1){
-				entityLabeltoIndexMap.put(str, index);
-				entityIndexToLabelMap.put(index, str);
-				index ++;
-			}
-			String[] entitySet2 = scan.nextLine().split(" ");
-			for(String str : entitySet2){
-				entityLabeltoIndexMap.put(str, index);
-				entityIndexToLabelMap.put(index, str);
-				index ++;
-			}
 			int cTermIndex = 0;
+			int eIndex = 0;
 			while(scan.hasNext()){
 				String exp = scan.nextLine();
 				StringBuilder firstEntity = new StringBuilder();
-				index = 0;
+				int index = 0;
 				while(exp.charAt(index) != ' '){
 					firstEntity.append(exp.charAt(index));
 					index ++;
+				}
+				if(!entityLabeltoIndexMap.containsKey(firstEntity.toString())){
+					entityLabeltoIndexMap.put(firstEntity.toString(), eIndex);
+					eIndex ++;
 				}
 				index ++;
 				while(exp.charAt(index) != ' '){
@@ -65,6 +56,12 @@ public class EntityHardeningILP {
 				for(String str: minterms){
 					if(mintermLabelToIndexMap.containsKey(str)) continue;
 					mintermLabelToIndexMap.put(str, cTermIndex);
+					for(String entity: str.split(" ")){
+						if(!entityLabeltoIndexMap.containsKey(entity)){
+							entityLabeltoIndexMap.put(entity, eIndex);
+							eIndex ++;
+						}
+					}
 					cTermIndex ++;
 				}
 				IIRs.put(firstEntity.toString(), Arrays.asList(minterms));
@@ -93,10 +90,9 @@ public class EntityHardeningILP {
 			createCVariables();
 			KVulnerableNodeILP attackerILP = new KVulnerableNodeILP(fileName, K);			
 			attackerILP.optimize();
+			attackerILP.generateFileForHeuristic();
 			gx = attackerILP.getInitialFailureX();
-			for(int i = 0; i < XCOUNT; i++){
-				if(gx[i] != 0) System.out.println(entityIndexToLabelMap.get(i) + " " + gx[i]);
-			}
+			compDeadInit = attackerILP.getFinalFailureX().size();
 			createConstraints();
 			createObjective();
 			cplex.solve();	
@@ -211,7 +207,6 @@ public class EntityHardeningILP {
 			System.out.println("\nX: ");
 			for(int i = 0; i < XCOUNT; i++) {
 				System.out.println();
-				System.out.print(entityIndexToLabelMap.get(i) + " ");
 				for (int j = 0; j < STEPS; j++) {
 					System.out.print(cplex.getValue(x[i][j]) + " ");
 				}
@@ -224,27 +219,16 @@ public class EntityHardeningILP {
 	public int printReport() {
 		int compnentsDead = 0;
 		try {
-			for(int i = 0; i < XCOUNT; i++)				 
+			for(int i = 0; i < XCOUNT; i++)	{		 
 				if (cplex.getValue(x[i][STEPS-1]) >0)
 					compnentsDead ++;
-			for(int i = 0; i < XCOUNT; i++){				 
-				if (cplex.getValue(x[i][0]) >0){
-					// System.out.println(i);
-				}
 			}
-			System.out.println("Initially Killed Entities");
-			for(int i = 0; i < XCOUNT; i++){
-				if(gx[i] != 0) System.out.print(entityIndexToLabelMap.get(i) + " ");
-			}
-			System.out.println("Hardened Entities");
-			for(int i = 0; i < XCOUNT; i++){
-				if(cplex.getValue(qx[i]) != 0) System.out.print(entityIndexToLabelMap.get(i) + " ");
-			}
-			System.out.println("\n\n==============================================");
+				
 			System.out.println("Time Steps       : " + STEPS);
 			System.out.println("Total Components : " + XCOUNT);
+			System.out.println("Components Dead Initially : " + compDeadInit);
 			System.out.println("Components Dead  : " + compnentsDead);
-			System.out.println("==============================================");			
+			System.out.println("Components Protected  : " + (compDeadInit - compnentsDead));		
 		} catch (Exception e) {
 			System.out.println(e.getMessage());
 		}
@@ -253,7 +237,7 @@ public class EntityHardeningILP {
 
 	public static void main(String args[]) {
 		
-		EntityHardeningILP ex = new EntityHardeningILP("DataSet1", 15, 6);
+		EntityHardeningILP ex = new EntityHardeningILP("DataSet1", 15, 4);
 		ex.optimize();
 		// ex.printX();
 		ex.printReport();

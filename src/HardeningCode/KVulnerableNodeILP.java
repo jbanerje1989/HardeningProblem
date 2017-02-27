@@ -37,25 +37,19 @@ public class KVulnerableNodeILP {
 			IIRs = new HashMap<String, List<String>>();
 			File caseFile = new File("OutputFiles/" + file + ".txt");
 			Scanner scan = new Scanner(caseFile);
-			String[] entitySet1 = scan.nextLine().split(" ");
-			int index = 0;
-			for(String str : entitySet1){
-				entityLabeltoIndexMap.put(str, index);
-				index ++;
-			}
-			String[] entitySet2 = scan.nextLine().split(" ");
-			for(String str : entitySet2){
-				entityLabeltoIndexMap.put(str, index);
-				index ++;
-			}
 			int cTermIndex = 0;
+			int eIndex = 0;
 			while(scan.hasNext()){
 				String exp = scan.nextLine();
 				StringBuilder firstEntity = new StringBuilder();
-				index = 0;
+				int index = 0;
 				while(exp.charAt(index) != ' '){
 					firstEntity.append(exp.charAt(index));
 					index ++;
+				}
+				if(!entityLabeltoIndexMap.containsKey(firstEntity.toString())){
+					entityLabeltoIndexMap.put(firstEntity.toString(), eIndex);
+					eIndex ++;
 				}
 				index ++;
 				while(exp.charAt(index) != ' '){
@@ -65,6 +59,12 @@ public class KVulnerableNodeILP {
 				for(String str: minterms){
 					if(mintermLabelToIndexMap.containsKey(str)) continue;
 					mintermLabelToIndexMap.put(str, cTermIndex);
+					for(String entity: str.split(" ")){
+						if(!entityLabeltoIndexMap.containsKey(entity)){
+							entityLabeltoIndexMap.put(entity, eIndex);
+							eIndex ++;
+						}
+					}
 					cTermIndex ++;
 				}
 				IIRs.put(firstEntity.toString(), Arrays.asList(minterms));
@@ -257,37 +257,20 @@ public class KVulnerableNodeILP {
 	public void generateFileForHeuristic() throws IOException{
 		StringBuilder sb = new StringBuilder();
 		List<Integer> finalFailure = getFinalFailureX();
+		int[] initialFailure = getInitialFailureX();
 		File caseFile = new File("OutputFiles/" + fileName + ".txt");
 		Scanner scan = new Scanner(caseFile);
-		String[] entitySet1 = scan.nextLine().split(" ");
-		int[] initFailure = getInitialFailureX();
-		int index = 0;
-		StringBuilder entitiesFailedInit = new StringBuilder();
-		for(String str : entitySet1){
-			if(finalFailure.contains(index)) sb.append(str + " ");
-			if(initFailure[index] == 1) entitiesFailedInit.append(str + " ");
-			index ++;
-		}
-		String[] entitySet2 = scan.nextLine().split(" ");
-		for(String str : entitySet2){
-			if(finalFailure.contains(index)) sb.append(str + " ");
-			if(initFailure[index] == 1) entitiesFailedInit.append(str + " ");
-			index ++;
-		}
-		sb.delete(sb.length() - 1, sb.length());
-		sb.append("\n");
-		entitiesFailedInit.delete(entitiesFailedInit.length() - 1, entitiesFailedInit.length());
-		sb.append(entitiesFailedInit.toString());
-		sb.append("\n");
+		
 		while(scan.hasNext()){
 			String exp = scan.nextLine();
 			StringBuilder firstEntity = new StringBuilder();
-			index = 0;
+			int index = 0;
 			while(exp.charAt(index) != ' '){
 				firstEntity.append(exp.charAt(index));
 				index ++;
 			}
 			if(!finalFailure.contains(entityLabeltoIndexMap.get(firstEntity.toString()))) continue;
+			if(initialFailure[entityLabeltoIndexMap.get(firstEntity.toString())] == 1) continue;
 			sb.append(firstEntity.toString() + " <-");
 			index ++;
 			while(exp.charAt(index) != ' '){
@@ -306,7 +289,7 @@ public class KVulnerableNodeILP {
 			sb.append("\n");
 		}
 		scan.close();
-		File file = new File("OutFileForHeuristics/" + fileName + "Heuristic" + "forK" + K + ".txt");
+		File file = new File("OutFileForHeuristics/" + fileName + ".txt");
 		BufferedWriter writer = null;
 		try {
 		    writer = new BufferedWriter(new FileWriter(file));
@@ -318,7 +301,7 @@ public class KVulnerableNodeILP {
 
 	public static void main(String args[]) throws IOException {
 		
-		KVulnerableNodeILP ex = new KVulnerableNodeILP("DataSet1", 15);
+		KVulnerableNodeILP ex = new KVulnerableNodeILP("case9IIRsAtTimeStep1", 4);
 		ex.optimize();
 		// ex.printX();
 		ex.printReport();
