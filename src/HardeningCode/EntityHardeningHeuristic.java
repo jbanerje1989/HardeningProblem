@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Scanner;
@@ -21,6 +22,10 @@ public class EntityHardeningHeuristic {
 		File caseFile = new File("OutFileForHeuristics/" + file + ".txt");
 		Scanner scan = new Scanner(caseFile);
 		int eIndex = 0;
+		for(String str: scan.nextLine().split(" ")){
+			entityLabeltoIndexMap.put(str, eIndex);
+			eIndex ++;
+		}
 		while(scan.hasNext()){
 			String exp = scan.nextLine();
 			StringBuilder firstEntity = new StringBuilder();
@@ -29,25 +34,14 @@ public class EntityHardeningHeuristic {
 				firstEntity.append(exp.charAt(index));
 				index ++;
 			}
-			if(!entityLabeltoIndexMap.containsKey(firstEntity.toString())){
-				entityLabeltoIndexMap.put(firstEntity.toString(), eIndex);
-				eIndex ++;
-			}
 			index ++;
 			while(exp.charAt(index) != ' '){
 				index ++;
 			}
 			String[] minterms = exp.substring(index + 1, exp.length()).split("   ");
 			List<List<String>> dependency = new ArrayList<List<String>>();
-			for(String str: minterms){
+			for(String str: minterms)
 				dependency.add(Arrays.asList(str.split(" ")));
-				for(String entity: str.split(" ")){
-					if(!entityLabeltoIndexMap.containsKey(entity)){
-						entityLabeltoIndexMap.put(entity, eIndex);
-						eIndex ++;
-					}
-				}
-			}
 			IIRs.put(firstEntity.toString(), dependency);
 		}
 		scan.close();
@@ -128,18 +122,19 @@ public class EntityHardeningHeuristic {
 				protectedEntities.add(str);
 
 			IIRs = new HashMap<String, List<List<String>>>();
-			for(String str: IIRsForIteration.keySet()){
+			for(String str: IIRsForIteration.keySet())
 				IIRs.put(str, IIRsForIteration.get(str));
-			}
-			
 		}
 		totalProtected = protectedEntities.size();
+		System.out.println("Protected Entities");
+		Collections.sort(protectedEntities);
+		System.out.println(protectedEntities);
 	}
 	
 	public int getTotalProtected() { return totalProtected;}
 	
 	public static void main(String[] args) throws FileNotFoundException{
-		EntityHardeningHeuristic Object = new EntityHardeningHeuristic("DataSet1Heuristic", 4);
+		EntityHardeningHeuristic Object = new EntityHardeningHeuristic("case30IIRsAtTimeStep1", 4);
 		Object.compute();
 		System.out.println("Total Protected: " +  Object.getTotalProtected());
 	}

@@ -5,8 +5,8 @@ import java.io.FileNotFoundException;
 
 public class DriverTargetedEntityHardening {
 	public static void main(String[] args) throws FileNotFoundException{
-		String fileName = "case9IIRsAtTimeStep1";
-		int KVal = 5;
+		String fileName = "DataSet1";
+		int KVal = 20;
 		int protectBudget = 4;
 		
 		System.out.println("ILP Output");

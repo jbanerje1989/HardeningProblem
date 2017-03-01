@@ -16,6 +16,7 @@ import ilog.cplex.*;
 public class KVulnerableNodeILP {
 	private HashMap<String, Integer> entityLabeltoIndexMap; 
 	private HashMap<String, Integer> mintermLabelToIndexMap;
+	private HashMap<Integer, String> entityIndexToLabelMap;
 	private HashMap<String, List<String>> IIRs;
 	private String fileName;
 	private int K;
@@ -34,6 +35,7 @@ public class KVulnerableNodeILP {
 		try {
 			entityLabeltoIndexMap = new HashMap<String, Integer>();
 			mintermLabelToIndexMap = new HashMap<String, Integer>();
+			entityIndexToLabelMap = new HashMap<Integer, String>();
 			IIRs = new HashMap<String, List<String>>();
 			File caseFile = new File("OutputFiles/" + file + ".txt");
 			Scanner scan = new Scanner(caseFile);
@@ -49,6 +51,7 @@ public class KVulnerableNodeILP {
 				}
 				if(!entityLabeltoIndexMap.containsKey(firstEntity.toString())){
 					entityLabeltoIndexMap.put(firstEntity.toString(), eIndex);
+					entityIndexToLabelMap.put(eIndex, firstEntity.toString());
 					eIndex ++;
 				}
 				index ++;
@@ -62,6 +65,7 @@ public class KVulnerableNodeILP {
 					for(String entity: str.split(" ")){
 						if(!entityLabeltoIndexMap.containsKey(entity)){
 							entityLabeltoIndexMap.put(entity, eIndex);
+							entityIndexToLabelMap.put(eIndex, entity);
 							eIndex ++;
 						}
 					}
@@ -208,11 +212,6 @@ public class KVulnerableNodeILP {
 			for(int i = 0; i < XCOUNT; i++)				 
 				if (cplex.getValue(x[i][STEPS-1]) >0)
 					compnentsDead ++;
-			for(int i = 0; i < XCOUNT; i++){				 
-				if (cplex.getValue(x[i][0]) >0){
-					// System.out.println(i);
-				}
-			}
 			System.out.println("\n\n==============================================");
 			System.out.println("Time Steps       : " + STEPS);
 			System.out.println("Total Components : " + XCOUNT);
@@ -224,7 +223,36 @@ public class KVulnerableNodeILP {
 		return compnentsDead;
 	}
 
-	public int[] getInitialFailureX() {
+	public List<String> getInitialFailureX() {
+		List<String> r = new ArrayList<String>();
+		List<String> finalFailure = getFinalFailureX();
+		try {
+			for(int i = 0; i < finalFailure.size(); i++) {
+				if (cplex.getValue(x[entityLabeltoIndexMap.get(finalFailure.get(i))][0]) > 0)
+					r.add(finalFailure.get(i));
+			}
+		}
+		catch(Exception e) {
+			System.out.println(e.getMessage());
+		}
+		return r;
+	}
+	
+	public int[] getInitialFailureArr() {
+		List<String> finalFailure = getFinalFailureX();
+		int[] r = new int[finalFailure.size()];
+		try {
+			for(int i = 0; i < finalFailure.size(); i++) 
+				if (cplex.getValue(x[entityLabeltoIndexMap.get(finalFailure.get(i))][0]) > 0)
+					r[i] = 1;
+		}
+		catch(Exception e) {
+			System.out.println(e.getMessage());
+		}
+		return r;
+	}
+	
+	public int[] getInitialFailureOrg() {
 		int[] r = new int[XCOUNT];
 		try {
 			for(int i = 0; i < XCOUNT; i++) {
@@ -240,12 +268,12 @@ public class KVulnerableNodeILP {
 		return r;
 	}
 	
-	public List<Integer> getFinalFailureX() {
-		List<Integer> r = new ArrayList<Integer>();
+	public List<String> getFinalFailureX() {
+		List<String> r = new ArrayList<String>();
 		try {
 			for(int i = 0; i < XCOUNT; i++) {
 				if (cplex.getValue(x[i][STEPS - 1]) > 0)
-					r.add(i);
+					r.add(entityIndexToLabelMap.get(i));
 			}
 		}
 		catch(Exception e) {
@@ -256,11 +284,14 @@ public class KVulnerableNodeILP {
 	
 	public void generateFileForHeuristic() throws IOException{
 		StringBuilder sb = new StringBuilder();
-		List<Integer> finalFailure = getFinalFailureX();
-		int[] initialFailure = getInitialFailureX();
+		List<String> finalFailure = getFinalFailureX();
+		List<String> initialFailure = getInitialFailureX();
 		File caseFile = new File("OutputFiles/" + fileName + ".txt");
 		Scanner scan = new Scanner(caseFile);
-		
+		for(String entity: getFinalFailureX())
+			sb.append(entity + " ");
+		sb.delete(sb.length() - 1, sb.length());
+		sb.append('\n');
 		while(scan.hasNext()){
 			String exp = scan.nextLine();
 			StringBuilder firstEntity = new StringBuilder();
@@ -269,8 +300,8 @@ public class KVulnerableNodeILP {
 				firstEntity.append(exp.charAt(index));
 				index ++;
 			}
-			if(!finalFailure.contains(entityLabeltoIndexMap.get(firstEntity.toString()))) continue;
-			if(initialFailure[entityLabeltoIndexMap.get(firstEntity.toString())] == 1) continue;
+			if(!finalFailure.contains(firstEntity.toString())) continue;
+			if(initialFailure.contains(firstEntity.toString())) continue;
 			sb.append(firstEntity.toString() + " <-");
 			index ++;
 			while(exp.charAt(index) != ' '){
@@ -281,10 +312,10 @@ public class KVulnerableNodeILP {
 			for(String str: minterms){
 				String[] vals = str.split(" ");
 				for(String entity: vals){
-					if(finalFailure.contains(entityLabeltoIndexMap.get(entity))) sb.append(" " + entity);
+					if(finalFailure.contains(entity)) sb.append(" " + entity);
 				}
-				if(index < minterms.length) sb.append("  ");
 				index ++;
+				if(index < minterms.length) sb.append("  ");
 			}
 			sb.append("\n");
 		}
@@ -301,7 +332,7 @@ public class KVulnerableNodeILP {
 
 	public static void main(String args[]) throws IOException {
 		
-		KVulnerableNodeILP ex = new KVulnerableNodeILP("case9IIRsAtTimeStep1", 4);
+		KVulnerableNodeILP ex = new KVulnerableNodeILP("case9IIRsAtTimeStep1", 7);
 		ex.optimize();
 		// ex.printX();
 		ex.printReport();

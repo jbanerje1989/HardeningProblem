@@ -5,9 +5,9 @@ import java.io.FileNotFoundException;
 
 public class DriverEntityHardening {
 	public static void main(String[] args) throws FileNotFoundException{
-		String fileName = "case9IIRsAtTimeStep1";
-		int KVal = 5;
-		int hardeningBudget = 4;
+		String fileName = "case39IIRsAtTimeStep1";
+		int KVal = 16;
+		int hardeningBudget = 14;
 		
 		System.out.println("ILP Output");
 		long startTime = System.currentTimeMillis();

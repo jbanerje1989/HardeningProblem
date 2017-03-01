@@ -3,6 +3,7 @@ package HardeningCode;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -30,17 +31,28 @@ public class TargetedEntityHardeningILP {
 	private IloIntVar[][] c;
 	private IloIntVar[] qx; // entity hardened array
 	private int[] gx; // input from run of K most vulnerable ILP
-		
-	public TargetedEntityHardeningILP(String file, int KVal, int numToHardenVal) {
+	
+	TargetedEntityHardeningILP(String file, int KVal, int numToHardenVal){
+		fileName = file;
+		K = KVal;
+		numToHarden = numToHardenVal;
+	}
+	
+	public void setClassVariables() {
 		try {
 			entityLabeltoIndexMap = new HashMap<String, Integer>();
 			entityIndextoLabelMap = new HashMap<Integer, String>();
 			mintermLabelToIndexMap = new HashMap<String, Integer>();
 			IIRs = new HashMap<String, List<String>>();
-			File caseFile = new File("OutputFiles/" + file + ".txt");
+			File caseFile = new File("OutFileForHeuristics/" + fileName + ".txt");
 			Scanner scan = new Scanner(caseFile);
 			int cTermIndex = 0;
 			int eIndex = 0;
+			for(String str: scan.nextLine().split(" ")){
+				entityLabeltoIndexMap.put(str, eIndex);
+				entityIndextoLabelMap.put(eIndex,  str);
+				eIndex ++;
+			}
 			while(scan.hasNext()){
 				String exp = scan.nextLine();
 				StringBuilder firstEntity = new StringBuilder();
@@ -48,11 +60,6 @@ public class TargetedEntityHardeningILP {
 				while(exp.charAt(index) != ' '){
 					firstEntity.append(exp.charAt(index));
 					index ++;
-				}
-				if(!entityLabeltoIndexMap.containsKey(firstEntity.toString())){
-					entityLabeltoIndexMap.put(firstEntity.toString(), eIndex);
-					entityIndextoLabelMap.put(eIndex, firstEntity.toString());
-					eIndex ++;
 				}
 				index ++;
 				while(exp.charAt(index) != ' '){
@@ -62,13 +69,6 @@ public class TargetedEntityHardeningILP {
 				for(String str: minterms){
 					if(mintermLabelToIndexMap.containsKey(str)) continue;
 					mintermLabelToIndexMap.put(str, cTermIndex);
-					for(String entity: str.split(" ")){
-						if(!entityLabeltoIndexMap.containsKey(entity)){
-							entityLabeltoIndexMap.put(entity, eIndex);
-							entityIndextoLabelMap.put(eIndex, entity);
-							eIndex ++;
-						}
-					}
 					cTermIndex ++;
 				}
 				IIRs.put(firstEntity.toString(), Arrays.asList(minterms));
@@ -77,9 +77,6 @@ public class TargetedEntityHardeningILP {
 			XCOUNT = entityLabeltoIndexMap.size();
 			CCOUNT = mintermLabelToIndexMap.size();
 			STEPS = IIRs.size() + 1;
-			fileName = file;
-			K = KVal;
-			numToHarden = numToHardenVal;
 			x = new IloIntVar[XCOUNT][STEPS];
 			c = new IloIntVar[CCOUNT][STEPS];
 			qx = new IloIntVar[XCOUNT];
@@ -93,16 +90,17 @@ public class TargetedEntityHardeningILP {
 	
 	public void optimize() {
 		try {
-			createXVariables();
-			createCVariables();
 			KVulnerableNodeILP attackerILP = new KVulnerableNodeILP(fileName, K);			
 			attackerILP.optimize();
 			attackerILP.generateFileForHeuristic();
-			gx = attackerILP.getInitialFailureX();
-			List<Integer> finalFailure = attackerILP.getFinalFailureX();
+			setClassVariables();
+			createXVariables();
+			createCVariables();
+			gx = attackerILP.getInitialFailureArr();
+			List<String> finalFailure = attackerILP.getFinalFailureX();
 			compDeadInit = finalFailure.size();
-			createConstraints(finalFailure);
 			createObjective();
+			createConstraints(finalFailure);
 			cplex.solve();	
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -141,7 +139,7 @@ public class TargetedEntityHardeningILP {
 		}
 	}
 
-	public void createConstraints(List<Integer> finalFailure) {
+	public void createConstraints(List<String> finalFailure) {
 		try {
 			// time step constraints	
 			IloNumExpr expr = cplex.constant(0);
@@ -152,12 +150,11 @@ public class TargetedEntityHardeningILP {
 			}
 			
 			// Set of entities to Harden
-			System.out.println(finalFailure);
 			Collections.shuffle(finalFailure);
 			StringBuilder sb = new StringBuilder();
 			for (int i = 0;i < numToHarden; i++){
-				cplex.addEq(x[finalFailure.get(i)][STEPS - 1], 0);
-				sb.append(entityIndextoLabelMap.get(finalFailure.get(i)) + " ");
+				cplex.addEq(x[entityLabeltoIndexMap.get(finalFailure.get(i))][STEPS - 1], 0);
+				sb.append(finalFailure.get(i) + " ");
 			}	
 			sb.delete(sb.length() - 1, sb.length());
 			File file = new File("OutFileForHeuristics/" + fileName + "Target.txt");
@@ -174,11 +171,6 @@ public class TargetedEntityHardeningILP {
 				cplex.addGe(x[i][0], cplex.diff(gx[i], qx[i]));
 			}
 			
-			// For all entities not in final failure set it should be zero
-			for(int i = 0; i < XCOUNT; i++)
-				if(!finalFailure.contains(i))
-					cplex.addEq(x[i][STEPS - 1], 0);
-		
 			// Generating constraints for IIRs
 			for(String str: IIRs.keySet()){
 				for(String minterms : IIRs.get(str)){
@@ -197,7 +189,7 @@ public class TargetedEntityHardeningILP {
 					IloNumExpr expr3 = cplex.constant(0);
 					double minCount = 0;
 					for(String minterms : IIRs.get(str)){
-						expr2 = cplex.sum(expr2, c[mintermLabelToIndexMap.get(minterms)][t - 1]);
+						expr2 = cplex.sum(expr2, c[mintermLabelToIndexMap.get(minterms)][t]);
 						minCount ++;
 					}
 					expr3 = cplex.sum(expr3, expr2);
@@ -244,15 +236,20 @@ public class TargetedEntityHardeningILP {
 		int compnentsDead = 0;
 		int compDef = 0;
 		try {
+			List<String> protectedE = new ArrayList<String>();
 			for(int i = 0; i < XCOUNT; i++)				 
 				if (cplex.getValue(x[i][STEPS-1]) >0)
 					compnentsDead ++;
+				else
+					protectedE.add(entityIndextoLabelMap.get(i));
+			System.out.println("Protected Entities");
+			Collections.sort(protectedE);
+			System.out.println(protectedE);
 			for(int i = 0; i < XCOUNT; i++){				 
 				if (cplex.getValue(qx[i]) >0){
 					compDef ++;
 				}
 			}
-	
 			System.out.println("Time Steps       : " + STEPS);
 			System.out.println("Total Components : " + XCOUNT);
 			System.out.println("Components Dead in K vulnerable entities : " + compDeadInit);
@@ -267,7 +264,7 @@ public class TargetedEntityHardeningILP {
 	}
 
 	public static void main(String args[]) {
-		TargetedEntityHardeningILP ex = new TargetedEntityHardeningILP("case9IIRsAtTimeStep1", 7, 5);
+		TargetedEntityHardeningILP ex = new TargetedEntityHardeningILP("case9IIRsAtTimeStep1",8, 5);
 		ex.optimize();
 		// ex.printX();
 		ex.printReport();
